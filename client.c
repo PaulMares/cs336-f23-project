@@ -33,5 +33,5 @@ void print_settings(char settings[][11][256]) {
 int main(int argc, char *argv[]) {
 	char settings[2][11][256] = {'\0'};
 	read_config(settings, argv[1]);
-	init_client(settings[2][0], settings[2][5]);
+	init_client(settings[1][0], settings[1][5]);
 }
