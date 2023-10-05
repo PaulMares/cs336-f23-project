@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "tcp.c"
+
 int read_config(char settings[][11][256], char *filename) {
 	FILE *fp = fopen(filename, "r");
 	char *key = malloc(64);
@@ -31,4 +33,5 @@ void print_settings(char settings[][11][256]) {
 int main(int argc, char *argv[]) {
 	char settings[2][11][256] = {'\0'};
 	read_config(settings, argv[1]);
+	init_client(settings[2][0], settings[2][5]);
 }

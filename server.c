@@ -6,18 +6,6 @@
 
 #include "tcp.c"
 
-void *get_in_addr(struct sockaddr *sa) {
-	if (sa->sa_family == AF_INET) {
-		struct sockaddr_in *sai = (struct sockaddr_in *)sa;
-		return &(sai->sin_addr);
-	} else if (sa->sa_family == AF_INET6) {
-		struct sockaddr_in6 *sai6 = (struct sockaddr_in6 *)sa;
-		return &(sai6->sin6_addr);
-	} else {
-		return NULL;
-	}
-}
-
 void listen_loop(int sock) {
 	struct sockaddr_storage client_addr;
 	socklen_t addr_size = sizeof(client_addr);
@@ -40,7 +28,7 @@ void listen_loop(int sock) {
 }
 
 int main(int argc, char *argv[]) {
-	int sock = init_server("3490");
+	int sock = init_server("7777");
 	printf("socket file descriptor: %d\n", sock);
 	printf("server: waiting for connection\n");
 	listen_loop(sock);
