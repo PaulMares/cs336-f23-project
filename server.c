@@ -3,8 +3,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <poll.h>
 
 #include "tcp.c"
+
+#define TIMEOUT 60
 
 void listen_loop(int sock) {
 	struct sockaddr_storage client_addr;
@@ -15,13 +18,44 @@ void listen_loop(int sock) {
 	while (1) {
 		client_fd = accept(sock, (struct sockaddr *) &client_addr, &addr_size);
 		if (client_fd == -1) {
-			fprintf(stderr, "accept");
 			continue;
 		}
 
 		inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), addr, sizeof(addr));
 		printf("Got connection from %s!\n", addr);
-		break;
+		
+		int timeout = TIMEOUT;
+		int pres;
+		char msg[1024];
+		int msg_size;
+		struct pollfd cpfd[1];
+		cpfd[0].fd = client_fd;
+		cpfd[0].events = POLLIN;
+
+		while (timeout > 0) {
+			pres = poll(cpfd, 1, 500);
+
+			if (pres == -1) {
+				fprintf(stderr, "poll error: %s\n", strerror(errno));
+				break;
+			} else if (pres == 0) {
+				timeout--;
+			} else if (cpfd[0].revents & POLLIN) {
+				msg_size = recv(client_fd, msg, 1024, 0);
+				if (msg_size == 0) {
+					break;
+				}
+				msg[msg_size] = '\0';
+				printf("Message: %s\n", msg);
+				timeout = TIMEOUT;
+			}
+		}
+
+		if (timeout <= 0) {
+			printf("Timeout, socket closing\n");
+		} else if (msg_size == 0) {
+			printf("Client disconnected\n");
+		}
 	}
 
 	return;

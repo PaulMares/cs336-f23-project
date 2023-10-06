@@ -127,4 +127,8 @@ int init_client(char *addr, char *port) {
 		fprintf(stderr, "couldn't connect: %s\n", strerror(errno));
 		exit(-3);
 	}
+
+	freeaddrinfo(servinfo);
+
+	return sock;
 }

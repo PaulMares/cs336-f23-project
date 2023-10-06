@@ -30,8 +30,20 @@ void print_settings(char settings[][11][256]) {
 	}
 }
 
+void message_loop(int sock) {
+	char msg[1024];
+	while (strcmp(msg, "quit")) {
+		memset(&msg, '\0', 1024);
+		printf("Message: ");
+		fgets(msg, 1024, stdin);
+		msg[strlen(msg) - 1] = '\0';
+		send(sock, msg, strlen(msg) + 1, 0);
+	}
+}
+
 int main(int argc, char *argv[]) {
 	char settings[2][11][256] = {'\0'};
 	read_config(settings, argv[1]);
-	init_client(settings[1][0], settings[1][5]);
+	int sock = init_client(settings[1][0], settings[1][5]);
+	message_loop(sock);
 }
