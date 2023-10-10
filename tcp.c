@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 
 // get_in_addr()
@@ -104,7 +105,7 @@ int init_server(char *port) {
 }
 
 int init_client(char *addr, char *port) {
-	int sock;
+	int sock = -1;
 	struct addrinfo *s;
 	struct addrinfo *servinfo = get_addr(addr, port);
 
@@ -128,7 +129,27 @@ int init_client(char *addr, char *port) {
 		exit(-3);
 	}
 
+	if (sock == -1) {
+		fprintf(stderr, "could not get socket: %s\n", strerror(errno));
+	}
+
 	freeaddrinfo(servinfo);
 
 	return sock;
+}
+
+int accept_connection(int sock) {
+	struct sockaddr_storage client_addr;
+	socklen_t addr_size = sizeof(client_addr);
+	int client_fd = -1;
+	char addr[INET6_ADDRSTRLEN];
+
+	while (client_fd == -1) {
+		client_fd = accept(sock, (struct sockaddr *) &client_addr, &addr_size);
+	}
+
+	inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), addr, sizeof(addr));
+	printf("Got connection from %s!\n", addr);
+
+	return client_fd;
 }
