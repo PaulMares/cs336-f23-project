@@ -1,6 +1,6 @@
 PROGS = compdetect_client compdetect_server
-CLIENT_OBJS = client.o
-SERVER_OBJS = server.o
+CLIENT_OBJS = client.o helper.o tcp.o
+SERVER_OBJS = server.o helper.o tcp.o
 
 %.o: %.c
 	gcc -g -c -o $@ $<

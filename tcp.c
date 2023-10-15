@@ -8,20 +8,19 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
+#include "tcp.h"
+#include "helper.h"
+
 // get_in_addr()
 // Returns the internet address contained in sa
 // params
 //   struct sockaddr *sa - sockaddr containing the address to return
 // returns
-//   sin6_addr or sin_addr depending on the internet protocol, or NULL if
-//   the protocol is unrecognized
+//   sin_addr, or NULL if the protocol is unrecognized
 void *get_in_addr(struct sockaddr *sa) {
 	if (sa->sa_family == AF_INET) {
 		struct sockaddr_in *sai = (struct sockaddr_in *)sa;
 		return &(sai->sin_addr);
-	} else if (sa->sa_family == AF_INET6) {
-		struct sockaddr_in6 *sai6 = (struct sockaddr_in6 *)sa;
-		return &(sai6->sin6_addr);
 	} else {
 		return NULL;
 	}
@@ -36,14 +35,14 @@ void *get_in_addr(struct sockaddr *sa) {
 // returns
 //   struct addrinfo *servinfo, a linked list of addrinfo's corresponding
 //   to the given addr
-struct addrinfo *get_addr(char *addr, char *port) {
+struct addrinfo *get_addr(char *addr, char *port, int socktype) {
 	int status;
 	struct addrinfo hints;
 	struct addrinfo *servinfo;
 
 	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = socktype;
 
 	if (addr == NULL) {
 		hints.ai_flags = AI_PASSIVE;
@@ -60,15 +59,14 @@ struct addrinfo *get_addr(char *addr, char *port) {
 // init_server()
 // attempts to bind a new socket, then returns that socket for the server to use
 // params
-//   
+//   char *port - port for the socket to bind to
 // returns
-//   
-int init_server(char *port) {
+//   int sock, the file descriptor for the socket
+int init_server(char *port, int socktype) {
 	int sock;
 	int yes = 1;
 	struct addrinfo *s;
-
-	struct addrinfo *servinfo = get_addr(NULL, port);
+	struct addrinfo *servinfo = get_addr(NULL, port, socktype);
 
 	for (s = servinfo; s != NULL; s = s->ai_next) {
 		if ((sock = socket(s->ai_family, s->ai_socktype, s->ai_protocol)) == -1) {
@@ -76,14 +74,14 @@ int init_server(char *port) {
 			continue;
 		}
 	
-		if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+		if (socktype == SOCK_STREAM && setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
 			fprintf(stderr, "setsockopt error: %s\n", strerror(errno));
 			exit(-2);
 		}
 
 		if (bind(sock, s->ai_addr, s->ai_addrlen) == -1) {
 			close(sock);
-			fprintf(stderr, "binding...");
+			verb("Binding...\n");
 			continue;
 		}
 
@@ -97,17 +95,26 @@ int init_server(char *port) {
 		exit(-3);
 	}
 
-	if (listen(sock, 10) == -1) {
+	if (socktype == SOCK_STREAM && listen(sock, 1) == -1) {
 		fprintf(stderr, "listen error: %s\n", strerror(errno));
 	}
 
 	return sock;
 }
 
-int init_client(char *addr, char *port) {
+// init_client()
+// attempts to connect a socket to the server
+// params
+//	 char *addr - address of the server
+//   char *port - port on which the server is listening
+// returns
+//   int sock, the file descriptor for the socket
+int init_client(char *addr, char *dst_port, char *src_port, int socktype) {
 	int sock = -1;
+	int bound = 1;
 	struct addrinfo *s;
-	struct addrinfo *servinfo = get_addr(addr, port);
+	struct addrinfo *servinfo = get_addr(addr, dst_port, socktype);
+	struct addrinfo *selfinfo = get_addr(NULL, src_port, socktype);
 
 	for (s = servinfo; s != NULL; s = s->ai_next) {
 		if ((sock = socket(s->ai_family, s->ai_socktype, s->ai_protocol)) == -1) {
@@ -115,13 +122,28 @@ int init_client(char *addr, char *port) {
 			continue;
 		}
 
+		if (bind(sock, selfinfo->ai_addr, selfinfo->ai_addrlen)) {
+			fprintf(stderr, "binding error: %s\n", strerror(errno));
+			bound = 0;
+			break;
+		}
+
 		if (connect(sock, s->ai_addr, s->ai_addrlen) == -1) {
 			close(sock);
-			fprintf(stderr, "connecting...\n");
+			verb("Connecting...\n");
 			continue;
 		}
 
 		break;
+	}
+
+	if (bound == 0) {
+		close(sock);
+		exit(-7);
+	}
+	
+	if (sock == -1) {
+		fprintf(stderr, "could not get socket: %s\n", strerror(errno));
 	}
 
 	if (s == NULL) {
@@ -129,27 +151,28 @@ int init_client(char *addr, char *port) {
 		exit(-3);
 	}
 
-	if (sock == -1) {
-		fprintf(stderr, "could not get socket: %s\n", strerror(errno));
-	}
-
 	freeaddrinfo(servinfo);
 
 	return sock;
 }
 
-int accept_connection(int sock) {
+// accept_connection()
+// attempts to accept a connection from a client
+// params
+//   int sock - the file descriptor for the socket that will accept a connection
+// returns
+//   int client_fd, the file descriptor for the client connection
+int accept_connection(int sock, char settings[][256]) {
 	struct sockaddr_storage client_addr;
 	socklen_t addr_size = sizeof(client_addr);
 	int client_fd = -1;
-	char addr[INET6_ADDRSTRLEN];
 
 	while (client_fd == -1) {
 		client_fd = accept(sock, (struct sockaddr *) &client_addr, &addr_size);
 	}
 
-	inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), addr, sizeof(addr));
-	printf("Got connection from %s!\n", addr);
+	inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), settings[11], 256);
+	verb("Got connection from %s!\n", settings[11]);
 
 	return client_fd;
 }
