@@ -1,11 +1,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/random.h>
 
 #include "helper.h"
-#include "tcp.h"
+#include "connect.h"
 
 void pre_probe(char settings[][256], char *filename) {
+	char *sett_text = malloc(1024);
+	int len = get_from_file(filename, sett_text);
+	read_config(settings, sett_text);
+	
 	verb("Initializing pre-probing phase...  ");
 	int sock = init_client(settings[SERVER_IP], settings[PRE_TCP], settings[PRE_TCP], SOCK_STREAM);
 	verb("Initialized!\n");
@@ -17,22 +22,9 @@ void pre_probe(char settings[][256], char *filename) {
 		verb("MTU: %dB\n", mtu);
 	}
 
-	int i;
+	verb("Sending settings...  ");
 
-	get_from_file(settings, filename);
-	verb("Sending settings:\n");
-	for (i = 0; i < 11; i++) {
-		if (send(sock, settings[i], (int)strlen(settings[i]) + 1, 0) == -1) {
-			fprintf(stderr, "send error: %s\n", strerror(errno));
-			verb("restarting...\n");
-			while (send(sock, "restart", strlen("restart") + 1, 0) == -1) {
-				continue;
-			}
-			i = -1;
-		}
-		verb("   %s\n", settings[i]);
-		usleep(5000);
-	}
+	send(sock, sett_text, len + 1, 0);
 
 	verb("Settings sent!\nPre-probing phase complete\n\n");
 	close(sock);
@@ -42,7 +34,7 @@ void pre_probe(char settings[][256], char *filename) {
 
 void probe(char settings[][256]) {
 	verb("Waiting for server...\n");
-	sleep(2);
+	sleep(1);
 	verb("Initializing probing phase...  ");
 	int sock = init_client(settings[SERVER_IP], settings[DST_UDP], settings[SRC_UDP], SOCK_DGRAM);
 	verb("Initialized!\n");
@@ -55,27 +47,63 @@ void probe(char settings[][256]) {
 	int num_packets = atoi(settings[UDP_AMOUNT]);
 	int size        = atoi(settings[UDP_SIZE]);
 
+	verb("Sending %d low-entropy packets\n", num_packets);
 	char msg[size];
 	memset(msg, 0, size);
+	send_udp(sock, num_packets, msg, size);
+	verb("Done sending, waiting %s seconds before continuing...  ", settings[INTER_TIME]);
 
-	sleep(1);
-	verb("Sending %d packets\n", num_packets);
-	for (int i = 0; i < num_packets; i++) {
-		msg[0] = (char) (i >> 8);
-		msg[1] = (char) i;
-		if (send(sock, msg, size, 0) == -1) {
-			fprintf(stderr, "send error: %s\n", strerror(errno));
-			exit(-1);
+	sleep(atoi(settings[INTER_TIME]));
+
+	verb("Done waiting\nSending %d high-entropy packets\n", num_packets);
+	int s = 0;
+	for (int i = 2; i < size; i += s) {
+		s = getrandom(&msg[i], (((size - i) < 256) ? (size - i) : 256), 0);
+		if (s == -1) {
+			fprintf(stderr, "getrandom error: %s\n", strerror(errno));
+			s = 0;
 		}
 	}
-
-	verb("Done sending\n");
-
+	send_udp(sock, num_packets, msg, size);
+	verb("Done sending\nProbing phase complete\n\n");
+	
 	close(sock);
 }
 
-void post_probe() {
-	
+void post_probe(char settings[][256]) {
+	verb("Waiting for server...\n");
+	sleep(10);
+	verb("Initializing post-probing phase...  ");
+	int sock = init_client(settings[SERVER_IP], settings[POST_TCP], settings[POST_TCP], SOCK_STREAM);
+	verb("Initialized!\n");
+
+	char msg[64];
+	int s = recv(sock, msg, 64, 0);
+	if (s <= 0) {
+		close(sock);
+		if (s == -1) {
+			fprintf(stderr, "recv error: %s\n", strerror(errno));
+		} else {
+			fprintf(stderr, "socket shut down: %s\n", strerror(errno));
+		}
+		exit(-8);
+	} else {
+		verb("Results received!\nPost-probing phase complete\n\n");
+	}
+
+	close(sock);
+
+	printf("Results:\n");
+	char *result = strtok(msg, "|");
+	char *value = malloc(16);
+	sscanf(result, "%*s %*s %s", value);
+	printf("  Compression         : %s\n", !strcmp("y", value) ? "yes" : "no");
+	result = strtok(NULL, "|");
+	sscanf(result, "%*s %*s %s", value);
+	printf("  delta-t low entropy : %s ms\n", value);
+	result = strtok(NULL, "|");
+	sscanf(result, "%*s %*s %s", value);
+	printf("  delta-t high entropy: %s ms\n", value);
 }
 
 int main(int argc, char *argv[]) {
@@ -86,15 +114,14 @@ int main(int argc, char *argv[]) {
 	verb("Starting\n");
 
 	if (config_idx == argc) {
-		get_from_file(settings, "config.ini"); // default config file
 		strncpy(filename, "config.ini", 256);
-		verb("Config file not specified, using default config file 'config.ini'\n");
+		verb("Config file not specified, using default config file 'config.ini'\n\n");
 	} else {
-		get_from_file(settings, argv[config_idx]);
 		strncpy(filename, argv[config_idx], 256);
-		verb("Using custom config file '%s'\n", argv[config_idx]);
+		verb("Using custom config file '%s'\n\n", argv[config_idx]);
 	}
 	
 	pre_probe(settings, filename);
 	probe(settings);
+	post_probe(settings);
 }

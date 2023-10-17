@@ -15,6 +15,6 @@ typedef enum {
 } setenum;
 
 int read_config(char settings[][256], char *sett_text);
-int get_from_file(char settings[][256], char *filename);
+int get_from_file(char *filename, char *sett_text);
 void verb(char *str, ...);
 int parse_params(int argc, char *argv[]);

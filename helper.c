@@ -9,7 +9,9 @@
 int verbose;
 
 int read_config(char settings[][256], char *sett_text) {
-	char *line = strtok(sett_text, "\n");
+	char *text_copy = malloc(1024);
+	strncpy(text_copy, sett_text, 1024);
+	char *line = strtok(text_copy, "\n");
 	char *value = malloc(256);
 	int i = 0;
 
@@ -22,7 +24,7 @@ int read_config(char settings[][256], char *sett_text) {
 	return i;
 }
 
-int get_from_file(char settings[][256], char *filename) {
+int get_from_file(char *filename, char *sett_text) {
 	FILE *fp = fopen(filename, "r");
 	
 	if (fp == NULL) {
@@ -31,21 +33,20 @@ int get_from_file(char settings[][256], char *filename) {
 	}
 	
 	char *value = malloc(128);
-	char *sett_text = malloc(1024);
+	int len = 0;
 
 	while (fgets(value, 128, fp) != NULL) {
 		strncat(sett_text, value, 256);
+		len += strlen(value);
 	}
 
-	sett_text[strlen(sett_text) - 1] = '\0';
+	sett_text[len - 1] = '\0';
 	
 	fclose(fp);
 	
 	free(value);
 
-	int sett_num = read_config(settings, sett_text);
-
-	return sett_num;
+	return len;
 }
 
 void verb(char *str, ...) {
@@ -54,6 +55,7 @@ void verb(char *str, ...) {
         va_start(args, str);
         vprintf(str, args);
         va_end(args);
+        fflush(stdout);
 	}
 }
 
