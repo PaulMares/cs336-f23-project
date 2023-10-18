@@ -6,6 +6,12 @@
 #include "helper.h"
 #include "connect.h"
 
+// pre_probe()
+// pre-probing phase of the client, parses contents of config file
+//   then sends unparsed file to server
+// params
+//   char settings[][256] - array that will contain the settings
+//	 char *filename - file name of the config file
 void pre_probe(char settings[][256], char *filename) {
 	char *sett_text = malloc(1024);
 	int len = get_from_file(filename, sett_text);
@@ -32,6 +38,12 @@ void pre_probe(char settings[][256], char *filename) {
 	return;
 }
 
+// probe()
+// probing phase of the client, sends a train of low-entropy udp
+//	 packets to the server, followed by a short pause, and then a train
+//   of high-entropy udp packets
+// params
+//   char settings[][256] - array that contains the settings
 void probe(char settings[][256]) {
 	verb("Waiting for server...\n");
 	sleep(1);
@@ -39,6 +51,7 @@ void probe(char settings[][256]) {
 	int sock = init_client(settings[SERVER_IP], settings[DST_UDP], settings[SRC_UDP], SOCK_DGRAM);
 	verb("Initialized!\n");
 
+	// don't fragment flag
 	int yes = IP_PMTUDISC_DO;
 	if (setsockopt(sock, IPPROTO_IP, IP_MTU_DISCOVER, &yes, sizeof(int)) != 0) {
 		fprintf(stderr, "setsockopt error: %s\n", strerror(errno));
@@ -47,6 +60,7 @@ void probe(char settings[][256]) {
 	int num_packets = atoi(settings[UDP_AMOUNT]);
 	int size        = atoi(settings[UDP_SIZE]);
 
+	// fill msg with 0
 	verb("Sending %d low-entropy packets\n", num_packets);
 	char msg[size];
 	memset(msg, 0, size);
@@ -55,6 +69,7 @@ void probe(char settings[][256]) {
 
 	sleep(atoi(settings[INTER_TIME]));
 
+	// call getrandom() until msg is filled with random bytes
 	verb("Done waiting\nSending %d high-entropy packets\n", num_packets);
 	int s = 0;
 	for (int i = 2; i < size; i += s) {
@@ -70,6 +85,11 @@ void probe(char settings[][256]) {
 	close(sock);
 }
 
+// post_probe()
+// post-probing phase of the client, receives the findings of the
+//   experiment from the server and displays them to the user
+// params
+//   char settings[][256] - array that contains the settings
 void post_probe(char settings[][256]) {
 	verb("Waiting for server...\n");
 	sleep(10);
@@ -97,7 +117,7 @@ void post_probe(char settings[][256]) {
 	char *result = strtok(msg, "|");
 	char *value = malloc(16);
 	sscanf(result, "%*s %*s %s", value);
-	printf("  Compression         : %s\n", !strcmp("y", value) ? "yes" : "no");
+	printf("  Compression         : %s\n", !strcmp("y", value) ? "Detected!" : "Not detected");
 	result = strtok(NULL, "|");
 	sscanf(result, "%*s %*s %s", value);
 	printf("  delta-t low entropy : %s ms\n", value);
@@ -113,11 +133,16 @@ int main(int argc, char *argv[]) {
 
 	verb("Starting\n");
 
+	// check if config file specified, else default to config.ini
 	if (config_idx == argc) {
-		strncpy(filename, "config.ini", 256);
+		strcpy(filename, "config.ini");
 		verb("Config file not specified, using default config file 'config.ini'\n\n");
 	} else {
-		strncpy(filename, argv[config_idx], 256);
+		if (((int) strlen(argv[config_idx])) > 255) {
+			fprintf(stderr, "config filename too long, max length is 255 characters\n");
+			exit(-1);
+		}
+		strncpy(filename, argv[config_idx], 255);
 		verb("Using custom config file '%s'\n\n", argv[config_idx]);
 	}
 	

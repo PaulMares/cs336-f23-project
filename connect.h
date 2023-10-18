@@ -14,4 +14,4 @@ int init_server(char *port, int socktype);
 int init_client(char *addr, char *dst_port, char *src_port, int socktype);
 int accept_connection(int sock, char settings[][256]);
 void send_udp(int sock, int num_packets, char msg[], int size);
-long recv_udp(int sock, char settings[][256], int *last_id);
+long recv_udp(int sock, char settings[][256], int *last_id, int *p_recv);

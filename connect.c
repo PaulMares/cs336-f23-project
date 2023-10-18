@@ -17,7 +17,7 @@
 // params
 //   struct sockaddr *sa - sockaddr containing the address to return
 // returns
-//   sin_addr, or NULL if the protocol is unrecognized
+//   &(sin_addr), or NULL if the protocol is unrecognized
 void *get_in_addr(struct sockaddr *sa) {
 	if (sa->sa_family == AF_INET) {
 		struct sockaddr_in *sai = (struct sockaddr_in *)sa;
@@ -184,8 +184,16 @@ int accept_connection(int sock, char settings[][256]) {
 	return client_fd;
 }
 
+// send_udp()
+// sends udp packets through an already-established connection
+// params
+//   int sock - socket descriptor for the connection
+//	 int num_packets - number of packets to send
+//	 char msg[] - message to be sent
+//   int size - size of msg in bytes
 void send_udp(int sock, int num_packets, char msg[], int size) {
 	for (uint16_t i = 0; i < num_packets; i++) {
+		// places packet id in first 2 bytes
 		msg[0] = (uint8_t) (i >> 8);
 		msg[1] = (uint8_t) i;
 		if (send(sock, msg, size, 0) == -1) {
@@ -195,26 +203,43 @@ void send_udp(int sock, int num_packets, char msg[], int size) {
 	}
 }
 
-long recv_udp(int sock, char settings[][256], int *last_id) {
+// recv_udp()
+// receives packets from an already-established connection
+// params
+//   int sock - socket descriptor for the connection
+//   char settings[][256] - settings received from the client
+//	 int *last_id - will contain the last packet ID received
+//	 int *p_recv - will contain the number of packets received
+// returns
+//   long msec, the number of milliseconds elapsed between the first
+//   and last packet received
+long recv_udp(int sock, char settings[][256], int *last_id, int *p_recv) {
 	struct timespec start_time;
 	struct timespec last_time;
 
 	int msg_size = atoi(settings[UDP_SIZE]);
 	int rcv = -1;
 	char msg[msg_size];
-	
+
+	// waits for first packet
 	while ((rcv = recv(sock, msg, msg_size, 0)) <= 0);
+	*p_recv += 1;
 	clock_gettime(CLOCK_REALTIME, &start_time);
 	clock_gettime(CLOCK_REALTIME, &last_time);
-	
+
+	// receives packets until 2 seconds elapse after last packet
 	while (difftime(time(NULL), last_time.tv_sec) < 2) {
 		rcv = recv(sock, msg, msg_size, MSG_DONTWAIT);
 		if (rcv > 0) {
-			*last_id = (((char) msg[0]) << 8) | ((char) msg[1]);
+			*p_recv += 1;
 			clock_gettime(CLOCK_REALTIME, &last_time);
 		}
 	}
 
+	// stores ID of last packet
+	*last_id = (((char) msg[0]) << 8) | ((char) msg[1]);
+
+	// calculates ms elapsed between first and last packets
 	long msec = (last_time.tv_nsec - start_time.tv_nsec) / 1000000;
 	msec += ((int) difftime(last_time.tv_sec, start_time.tv_sec)) * 1000;
 	return msec;
