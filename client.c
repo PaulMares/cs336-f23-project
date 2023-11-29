@@ -74,14 +74,7 @@ void probe(char settings[][256]) {
 
 	// call getrandom() until msg is filled with random bytes
 	verb("Done waiting\nSending %d high-entropy packets\n", num_packets);
-	int s = 0;
-	for (int i = 2; i < size; i += s) {
-		s = getrandom(&msg[i], (((size - i) < 256) ? (size - i) : 256), 0);
-		if (s == -1) {
-			fprintf(stderr, "getrandom error: %s\n", strerror(errno));
-			s = 0;
-		}
-	}
+	make_high_entropy(msg, size);
 	send_udp(sock, num_packets, msg, size);
 	verb("Done sending\nProbing phase complete\n\n");
 	

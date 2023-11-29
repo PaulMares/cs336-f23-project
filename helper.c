@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <sys/random.h>
 
 #include "helper.h"
 
@@ -100,6 +101,7 @@ int parse_params(int argc, char *argv[]) {
 	return i;
 }
 
+//
 uint16_t checksum(uint16_t *header, int len) {
 	uint32_t sum;
 	for (sum = 0; len > 0; len--) {
@@ -108,4 +110,16 @@ uint16_t checksum(uint16_t *header, int len) {
 	sum = (sum >> 16) + (sum & 0xFFFF);
 	sum += (sum >> 16);
 	return ~sum;
+}
+
+//
+void make_high_entropy(char msg[], int size) {
+	int s = 0;
+	for (int i = 2; i < size; i += s) {
+		s = getrandom(&msg[i], (((size - i) < 256) ? (size - i) : 256), 0);
+		if (s == -1) {
+			fprintf(stderr, "getrandom error: %s\n", strerror(errno));
+			s = 0;
+		}
+	}
 }

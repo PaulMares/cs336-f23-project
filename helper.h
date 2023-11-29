@@ -22,3 +22,4 @@ int get_from_file(char *filename, char *sett_text);
 void verb(char *str, ...);
 int parse_params(int argc, char *argv[]);
 uint16_t checksum(uint16_t *header, int len);
+void make_high_entropy(char msg[], int size);

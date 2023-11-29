@@ -197,10 +197,17 @@ int init_client(char *addr, char *dst_port, char *src_port, int socktype) {
 //   int sock, the file descriptor for the socket
 int init_raw() {
 	int sock;
+	int one = 1;
 	if ((sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP)) == -1) {
 		fprintf(stderr, "raw socket error: %s\n", strerror(errno));
 		exit(-1);
 	}
+	
+	if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(int)) < 0) {
+		fprintf(stderr, "hdrincl error: %s\n", strerror(errno));
+		exit(-1);
+	}
+	
 	return sock;
 }
 
