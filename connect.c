@@ -8,6 +8,8 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <time.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
 
 #include "connect.h"
 #include "helper.h"
@@ -50,6 +52,30 @@ struct addrinfo *get_addr(char *addr, char *port, int socktype) {
 	}
 
 	if ((status = getaddrinfo(addr, port, &hints, &servinfo)) != 0) {
+		fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
+		exit(-1);
+	}
+
+	return servinfo;
+}
+
+// get_host()
+// 
+// params
+//   
+// returns
+//   
+struct addrinfo *get_host(char *port, int socktype) {
+	int status;
+	struct addrinfo hints;
+	struct addrinfo *servinfo;
+
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = socktype;
+	hints.ai_flags = AI_CANONNAME;
+
+	if ((status = getaddrinfo(NULL, port, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
 		exit(-1);
 	}
@@ -107,7 +133,9 @@ int init_server(char *port, int socktype) {
 // attempts to connect a socket to the server
 // params
 //	 char *addr - address of the server
-//   char *port - port on which the server is listening
+//   char *dst_port - port on which the server is listening
+//   char *src_port - port from which the client will send packets
+//   int socktype - either SOCK_STREAM (TCP) or SOCK_DGRAM (UDP)
 // returns
 //   int sock, the file descriptor for the socket
 int init_client(char *addr, char *dst_port, char *src_port, int socktype) {
@@ -163,6 +191,21 @@ int init_client(char *addr, char *dst_port, char *src_port, int socktype) {
 	return sock;
 }
 
+// init_raw()
+// creates a tcp raw socket
+// returns
+//   int sock, the file descriptor for the socket
+int init_raw() {
+	int sock;
+	if ((sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP)) == -1) {
+		fprintf(stderr, "raw socket error: %s\n", strerror(errno));
+		exit(-1);
+	}
+	return sock;
+}
+
+
+
 // accept_connection()
 // attempts to accept a connection from a client
 // params
@@ -196,10 +239,7 @@ void send_udp(int sock, int num_packets, char msg[], int size) {
 		// places packet id in first 2 bytes
 		msg[0] = (uint8_t) (i >> 8);
 		msg[1] = (uint8_t) i;
-		if (send(sock, msg, size, 0) == -1) {
-			fprintf(stderr, "send error: %s\n", strerror(errno));
-			exit(-1);
-		}
+		send(sock, msg, size, 0);
 	}
 }
 
@@ -243,4 +283,85 @@ long recv_udp(int sock, char settings[][256], int *last_id, int *p_recv) {
 	long msec = (last_time.tv_nsec - start_time.tv_nsec) / 1000000;
 	msec += ((int) difftime(last_time.tv_sec, start_time.tv_sec)) * 1000;
 	return msec;
+}
+
+// pack_ip()
+// packs an iphdr struct from settings
+// params
+//   
+// returns
+//   
+void pack_ip(struct iphdr *header, uint8_t ttl,
+			 uint32_t src_addr, uint32_t dst_addr) {	
+	header->ihl = 0x5;
+	header->version = 0x4;
+	header->tos = 0x0;
+	header->tot_len = htons(0x28);
+	header->id = htons(0x15);
+	header->frag_off = htons(0x4000);
+	header->ttl = ttl;
+	header->protocol = 0x6;
+	header->check = 0x0;
+	header->saddr = src_addr;
+	header->daddr = dst_addr;
+}
+
+// pack_tcp()
+// packs a tcphdr struct from settings
+// params
+//   
+// returns
+//   
+void pack_tcp(struct tcphdr *header, uint16_t port) {
+	header->source = htons(0x6F0);
+	header->dest = htons(port);
+	header->seq = htonl(0x6F0);
+	header->ack_seq = 0x0;
+	header->res1 = 0x0;
+	header->doff = 0x5;
+	header->fin = 0x0;
+	header->syn = 0x1;
+	header->rst = 0x0;
+	header->psh = 0x0;
+	header->ack = 0x0;
+	header->urg = 0x0;
+	header->res2 = 0x0;
+	header->window = 0x0;
+	header->check = 0x0;
+	header->urg_ptr = 0x0;
+}
+
+struct addrinfo *make_syn(char synhdr[40], char settings[][256], int port) {
+	char pseudo[32];
+	uint32_t src_addr;
+	int hort = port == 0 ? DST_TCP_H : DST_TCP_T;
+	inet_pton(AF_INET, settings[SOURCE_IP], &src_addr);
+
+	struct addrinfo *dst_addrinfo = get_addr(settings[SERVER_IP],
+										 settings[hort],
+										 SOCK_STREAM);
+
+	uint32_t dst_addr = ((struct sockaddr_in *)dst_addrinfo->ai_addr)->sin_addr.s_addr;
+
+	struct pseudo_header pshdr = {
+		.source_address = src_addr,
+		.dest_address = dst_addr,
+		.placeholder = 0x0,
+		.protocol = IPPROTO_TCP,
+		.tcp_length = htons(20)
+	};
+
+	struct iphdr *ip = (struct iphdr *)synhdr;
+	struct tcphdr *tcp = (struct tcphdr *)(synhdr + 20);
+
+	pack_ip(ip, atoi(settings[UDP_TTL]), src_addr, dst_addr);
+	pack_tcp(tcp, hort);
+
+	memcpy(pseudo, (char *)&pshdr, sizeof(struct pseudo_header));
+	memcpy(pseudo + sizeof(struct pseudo_header), tcp, 20);
+
+	tcp->check = checksum((uint16_t *)pseudo, 16);
+	ip->check = checksum((uint16_t *)synhdr, 20);
+
+	return dst_addrinfo;
 }

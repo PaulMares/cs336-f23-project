@@ -99,3 +99,13 @@ int parse_params(int argc, char *argv[]) {
 	}
 	return i;
 }
+
+uint16_t checksum(uint16_t *header, int len) {
+	uint32_t sum;
+	for (sum = 0; len > 0; len--) {
+		sum += *header++;
+	}
+	sum = (sum >> 16) + (sum & 0xFFFF);
+	sum += (sum >> 16);
+	return ~sum;
+}

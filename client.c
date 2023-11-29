@@ -18,7 +18,8 @@ void pre_probe(char settings[][256], char *filename) {
 	read_config(settings, sett_text);
 	
 	verb("Initializing pre-probing phase...  ");
-	int sock = init_client(settings[SERVER_IP], settings[PRE_TCP], settings[PRE_TCP], SOCK_STREAM);
+	int sock = init_client(settings[SERVER_IP], settings[PRE_TCP],
+						   settings[PRE_TCP], SOCK_STREAM);
 	verb("Initialized!\n");
 
 	if (verbose) {
@@ -48,7 +49,8 @@ void probe(char settings[][256]) {
 	verb("Waiting for server...\n");
 	sleep(1);
 	verb("Initializing probing phase...  ");
-	int sock = init_client(settings[SERVER_IP], settings[DST_UDP], settings[SRC_UDP], SOCK_DGRAM);
+	int sock = init_client(settings[SERVER_IP], settings[DST_UDP],
+						   settings[SRC_UDP], SOCK_DGRAM);
 	verb("Initialized!\n");
 
 	// don't fragment flag
@@ -65,7 +67,8 @@ void probe(char settings[][256]) {
 	char msg[size];
 	memset(msg, 0, size);
 	send_udp(sock, num_packets, msg, size);
-	verb("Done sending, waiting %s seconds before continuing...  ", settings[INTER_TIME]);
+	verb("Done sending, waiting %s seconds before continuing...  ",
+		 settings[INTER_TIME]);
 
 	sleep(atoi(settings[INTER_TIME]));
 
@@ -94,7 +97,8 @@ void post_probe(char settings[][256]) {
 	verb("Waiting for server...\n");
 	sleep(10);
 	verb("Initializing post-probing phase...  ");
-	int sock = init_client(settings[SERVER_IP], settings[POST_TCP], settings[POST_TCP], SOCK_STREAM);
+	int sock = init_client(settings[SERVER_IP], settings[POST_TCP],
+						   settings[POST_TCP], SOCK_STREAM);
 	verb("Initialized!\n");
 
 	char msg[64];
@@ -117,7 +121,8 @@ void post_probe(char settings[][256]) {
 	char *result = strtok(msg, "|");
 	char *value = malloc(16);
 	sscanf(result, "%*s %*s %s", value);
-	printf("  Compression         : %s\n", !strcmp("y", value) ? "Detected!" : "Not detected");
+	printf("  Compression         : %s\n",
+		   !strcmp("y", value) ? "Detected!" : "Not detected");
 	result = strtok(NULL, "|");
 	sscanf(result, "%*s %*s %s", value);
 	printf("  delta-t low entropy : %s ms\n", value);
@@ -127,7 +132,7 @@ void post_probe(char settings[][256]) {
 }
 
 int main(int argc, char *argv[]) {
-	char settings[11][256] = {'\0'};
+	char settings[12][256] = {'\0'};
 	int config_idx = parse_params(argc, argv);
 	char *filename = malloc(256);
 

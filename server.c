@@ -37,7 +37,7 @@ int pre_probe(char settings[][256], char *port) {
 			fprintf(stderr, "socket shut down: %s\n", strerror(errno));
 		}
 		exit(-8);
-	} else if (i != 11) {
+	} else if (i != 12) {
 		fprintf(stderr, "failed to receive settings, shutting down\n");
 		close(client_fd);
 		close(sock);
