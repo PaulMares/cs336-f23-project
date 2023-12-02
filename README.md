@@ -14,6 +14,9 @@ Compression of Traffic Flows by Intermediaries](https://www.cs.usfca.edu/vahab/r
 - Part 1: client-server applications
 	- Building
 	- Running
+- Part 2: standalone application
+	- Building
+ 	- Running
 
 
 ## Requirements
@@ -35,6 +38,8 @@ config.ini file with the following options:
 
 - `server-addr`: The IPv4 address of the server application, **must be set for
 	the client and standalone applications to work**.
+- `client-addr`: The IPv4 address of the client or standalone application,
+	**must be set for the standalone application to work**.
 - `source-port`: The port that the client will bind to when communicating with
 	the server. (default value: 9876)
 - `dest-udp-port`: The port that the server will listen on when receiving UDP
@@ -93,3 +98,32 @@ application in a terminal and run the appropriate command:
 - Client: `./compdetect_client [OPTIONS] [CONFIG_FILE]`
 	- `CONFIG_FILE` is the filename of the configuration file. If unspecified,
 		it will default to `config.ini`
+
+
+## Part 2: standalone application
+
+Part 2 consists of one application that will ping a remote server.
+
+
+### Building
+
+1. Download the source code on a computer or virtual machine
+1. Open the downloaded source code folder in a terminal
+1. Use `make` to run the Makefile and compile the program
+
+
+### Running
+
+Prior to running the standalone application, make sure to set the configuration file
+parameters `server-addr` and `client-addr` to the IPv4 addresses of the server and
+host respectively.
+
+The atandalone application only has one option, `-v`, which enables verbose mode.
+To run it you must open the folder containing the application in a terminal and 
+run the following command:
+
+- Client: `sudo ./compdetect [OPTIONS] [CONFIG_FILE]`
+	- `CONFIG_FILE` is the filename of the configuration file. If unspecified,
+		it will default to `config.ini`
+	- For the program to work, you **must use sudo**.
+
