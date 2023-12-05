@@ -62,6 +62,18 @@ config.ini file with the following options:
 - `udp-packet-ttl`: Max number of hops allowed for UDP packets sent by the
 	standalone application. (default value: 255)
 
+**Notes**
+- `port` numbers can be any number between 1 and 65535, but they cannot be a
+  	reserved port
+- Although 5 seconds is typically enough for `measurement-time`, 15
+  	seconds is recommended for slower networks
+- The effects of compression become more pronounced with a larger
+	`udp-train-len`, with diminishing returns. Smaller values may be easier
+	for smaller networks but it will be harder to detect compression
+- `udp-packet-ttl` should be a number between 1 and 255. Values too small may
+  	prevent the program for working, but can also be used to find
+  	how many hops away the compression link is
+
 
 ## Part 1: client-server applications
 
@@ -116,9 +128,10 @@ Part 2 consists of one application that will ping a remote server.
 
 Prior to running the standalone application, make sure to set the configuration file
 parameters `server-addr` and `client-addr` to the IPv4 addresses of the server and
-host respectively.
+host respectively. The server can be any computer connected to the Internet that will
+respond to TCP connections.
 
-The atandalone application only has one option, `-v`, which enables verbose mode.
+The standalone application only has one option, `-v`, which enables verbose mode.
 To run it you must open the folder containing the application in a terminal and 
 run the following command:
 
