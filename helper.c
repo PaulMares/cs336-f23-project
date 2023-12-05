@@ -13,7 +13,8 @@ int verbose;
 // reads configuration settings from a string
 // params
 //   char settings[][256] - array that will contain the settings
-//	 char *sett_text - string containing settings, each line separated by a '\n' character
+//	 char *sett_text      - string containing settings, each line separated by 
+//							a '\n' character
 // returns
 //   int i, the number of settings read from sett_text
 int read_config(char settings[][256], char *sett_text) {
@@ -37,7 +38,7 @@ int read_config(char settings[][256], char *sett_text) {
 // get_from_file()
 // returns contents of a file as a single string
 // params
-//   char *filename - name of the file to read from
+//   char *filename  - name of the file to read from
 //   char *sett_text - string that will contain contents of the file
 // returns
 //   int len, the length of string sett_text
@@ -52,6 +53,7 @@ int get_from_file(char *filename, char *sett_text) {
 	char *value = malloc(128);
 	int len = 0;
 
+	// append every key-value pair to sett_text
 	while (fgets(value, 128, fp) != NULL) {
 		strncat(sett_text, value, 256);
 		len += strlen(value);
@@ -70,7 +72,7 @@ int get_from_file(char *filename, char *sett_text) {
 // prints verbose logging statements if enabled
 // params
 //   char *str - format string to print
-//	 ... - values for format specifier(s) in str
+//	 ...       - values for format specifier(s) in str
 void verb(char *str, ...) {
 	if (verbose == 1) {
 		va_list args;
@@ -84,7 +86,7 @@ void verb(char *str, ...) {
 // parse_params()
 // parses the parameters passed in argv
 // params
-//   int argc - number of parameters passed in command line
+//   int argc     - number of parameters passed in command line
 //   char *argv[] - parameters passed in command line
 // returns
 //   int i, the index of the first non-optional parameter
@@ -101,7 +103,13 @@ int parse_params(int argc, char *argv[]) {
 	return i;
 }
 
-//
+// checksum()
+// calculates the checksum of an array of type uint16_t
+// params
+//   uint16_t *header - array for which the checksum will be calculated
+//   int len          - size of the array in bytes divided by 2
+// returns
+//   uint32_t sum, the checksum of header
 uint16_t checksum(uint16_t *header, int len) {
 	uint32_t sum;
 	for (sum = 0; len > 0; len--) {
@@ -112,7 +120,11 @@ uint16_t checksum(uint16_t *header, int len) {
 	return ~sum;
 }
 
-//
+// make_high_entropy()
+// packs an array with random bytes
+// params
+//   char msg[] - array that will hold the high-entropy message
+//   int size   - size of the array in bytes
 void make_high_entropy(char msg[], int size) {
 	int s = 0;
 	for (int i = 2; i < size; i += s) {

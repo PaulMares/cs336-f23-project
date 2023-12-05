@@ -59,34 +59,11 @@ struct addrinfo *get_addr(char *addr, char *port, int socktype) {
 	return servinfo;
 }
 
-// get_host()
-// 
-// params
-//   
-// returns
-//   
-struct addrinfo *get_host(char *port, int socktype) {
-	int status;
-	struct addrinfo hints;
-	struct addrinfo *servinfo;
-
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = socktype;
-	hints.ai_flags = AI_CANONNAME;
-
-	if ((status = getaddrinfo(NULL, port, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-		exit(-1);
-	}
-
-	return servinfo;
-}
-
 // init_server()
 // attempts to bind a new socket, then returns that socket for the server to use
 // params
-//   char *port - port for the socket to bind to
+//   char *port   - port for the socket to bind to
+//   int socktype - eithere SOCK_STREAM (TCP) or SOCK_DGRAM (UDP)
 // returns
 //   int sock, the file descriptor for the socket
 int init_server(char *port, int socktype) {
@@ -132,10 +109,10 @@ int init_server(char *port, int socktype) {
 // init_client()
 // attempts to connect a socket to the server
 // params
-//	 char *addr - address of the server
+//	 char *addr     - address of the server
 //   char *dst_port - port on which the server is listening
 //   char *src_port - port from which the client will send packets
-//   int socktype - either SOCK_STREAM (TCP) or SOCK_DGRAM (UDP)
+//   int socktype   - either SOCK_STREAM (TCP) or SOCK_DGRAM (UDP)
 // returns
 //   int sock, the file descriptor for the socket
 int init_client(char *addr, char *dst_port, char *src_port, int socktype) {
@@ -216,7 +193,9 @@ int init_raw() {
 // accept_connection()
 // attempts to accept a connection from a client
 // params
-//   int sock - the file descriptor for the socket that will accept a connection
+//   int sock             - the file descriptor for the socket that will accept
+//							a connection
+//   char settings[][256] - array containing the program's settings
 // returns
 //   int client_fd, the file descriptor for the client connection
 int accept_connection(int sock, char settings[][256]) {
@@ -237,10 +216,10 @@ int accept_connection(int sock, char settings[][256]) {
 // send_udp()
 // sends udp packets through an already-established connection
 // params
-//   int sock - socket descriptor for the connection
+//   int sock        - socket descriptor for the connection
 //	 int num_packets - number of packets to send
-//	 char msg[] - message to be sent
-//   int size - size of msg in bytes
+//	 char msg[]      - message to be sent
+//   int size        - size of msg in bytes
 void send_udp(int sock, int num_packets, char msg[], int size) {
 	for (uint16_t i = 0; i < num_packets; i++) {
 		// places packet id in first 2 bytes
@@ -251,12 +230,12 @@ void send_udp(int sock, int num_packets, char msg[], int size) {
 }
 
 // recv_udp()
-// receives packets from an already-established connection
+// receives UDP packets from an already-established connection
 // params
-//   int sock - socket descriptor for the connection
+//   int sock             - socket descriptor for the connection
 //   char settings[][256] - settings received from the client
-//	 int *last_id - will contain the last packet ID received
-//	 int *p_recv - will contain the number of packets received
+//	 int *last_id         - will contain the last packet ID received
+//	 int *p_recv          - will contain the number of packets received
 // returns
 //   long msec, the number of milliseconds elapsed between the first
 //   and last packet received
@@ -293,11 +272,12 @@ long recv_udp(int sock, char settings[][256], int *last_id, int *p_recv) {
 }
 
 // pack_ip()
-// packs an iphdr struct from settings
+// packs an iphdr struct
 // params
-//   
-// returns
-//   
+//   struct iphdr *header - iphdr to be filled
+//   uint8_t ttl          - number of hops allowed for the packet
+//   uint32_t src_addr    - source IP address for the packet
+//   uint32_t dst_addr    - destination IP address for the packet
 void pack_ip(struct iphdr *header, uint8_t ttl,
 			 uint32_t src_addr, uint32_t dst_addr) {	
 	header->ihl = 0x5;
@@ -316,9 +296,8 @@ void pack_ip(struct iphdr *header, uint8_t ttl,
 // pack_tcp()
 // packs a tcphdr struct from settings
 // params
-//   
-// returns
-//   
+//   struct tcphdr *header - tcphdr to be filled
+//   uint16_t port         - port at destination
 void pack_tcp(struct tcphdr *header, uint16_t port) {
 	header->source = htons(0x6F0);
 	header->dest = htons(port);
@@ -338,6 +317,15 @@ void pack_tcp(struct tcphdr *header, uint16_t port) {
 	header->urg_ptr = 0x0;
 }
 
+// make_syn()
+// creates and fills a TCP SYN packet
+// params
+//   char synhdr[40]      - char array that will contain the IP anc TCP headers
+//   char settings[][256] - array containing the program's settings
+//   int port             - 0 for the head packet's port, 1 for the tail's
+// returns
+//   struct addrinfo *dst_addrinfo, the addrinfo of the address and port
+//   specified
 struct addrinfo *make_syn(char synhdr[40], char settings[][256], int port) {
 	char pseudo[32];
 	uint32_t src_addr;
@@ -350,6 +338,7 @@ struct addrinfo *make_syn(char synhdr[40], char settings[][256], int port) {
 
 	uint32_t dst_addr = ((struct sockaddr_in *)dst_addrinfo->ai_addr)->sin_addr.s_addr;
 
+	// fill pseudo-header for TCP checksum
 	struct pseudo_header pshdr = {
 		.source_address = src_addr,
 		.dest_address = dst_addr,
@@ -364,6 +353,7 @@ struct addrinfo *make_syn(char synhdr[40], char settings[][256], int port) {
 	pack_ip(ip, atoi(settings[UDP_TTL]), src_addr, dst_addr);
 	pack_tcp(tcp, hort);
 
+	// create pseudogram for TCP checksum
 	memcpy(pseudo, (char *)&pshdr, sizeof(struct pseudo_header));
 	memcpy(pseudo + sizeof(struct pseudo_header), tcp, 20);
 
