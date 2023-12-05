@@ -38,7 +38,7 @@ config.ini file with the following options:
 
 - `server-addr`: The IPv4 address of the server application, **must be set for
 	the client and standalone applications to work**.
-- `client-addr`: The IPv4 address of the client or standalone application,
+- `source-addr`: The IPv4 address of the client or standalone application,
 	**must be set for the standalone application to work**.
 - `source-port`: The port that the client will bind to when communicating with
 	the server. (default value: 9876)

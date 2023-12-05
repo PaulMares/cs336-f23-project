@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <sys/random.h>
+#include <ctype.h>
 
 #include "helper.h"
 
@@ -30,7 +31,17 @@ int read_config(char settings[][256], char *sett_text) {
 		sscanf(line, "%*s %*s %255s", value);
 		strncpy(settings[i], value, 256);
 		i++;
-	} while ((line = strtok(NULL, "\n")) != NULL);
+	} while (((line = strtok(NULL, "\n")) != NULL) && i < 12);
+
+	// checks settings are numbers
+	for (int i = 2; i < 12; i++) {
+		for (int j = 0; (j < 256) & (settings[i][j] != 0); j++) {
+			if (!isdigit(settings[i][j])) {
+				printf("settings error: %s\n", settings[i]);
+				exit(-1);
+			}
+		}
+	}
 
 	return i;
 }

@@ -329,7 +329,7 @@ void pack_tcp(struct tcphdr *header, uint16_t port) {
 struct addrinfo *make_syn(char synhdr[40], char settings[][256], int port) {
 	char pseudo[32];
 	uint32_t src_addr;
-	int hort = port == 0 ? DST_TCP_H : DST_TCP_T;
+	int hort = (port == 0) ? DST_TCP_H : DST_TCP_T;
 	inet_pton(AF_INET, settings[SOURCE_IP], &src_addr);
 
 	struct addrinfo *dst_addrinfo = get_addr(settings[SERVER_IP],
@@ -351,7 +351,7 @@ struct addrinfo *make_syn(char synhdr[40], char settings[][256], int port) {
 	struct tcphdr *tcp = (struct tcphdr *)(synhdr + 20);
 
 	pack_ip(ip, atoi(settings[UDP_TTL]), src_addr, dst_addr);
-	pack_tcp(tcp, hort);
+	pack_tcp(tcp, atoi(settings[hort]));
 
 	// create pseudogram for TCP checksum
 	memcpy(pseudo, (char *)&pshdr, sizeof(struct pseudo_header));
